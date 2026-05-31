@@ -9,34 +9,46 @@ def enviar_telegram(mensagem):
     try:
         requests.post(
             "https://api.telegram.org/bot" + TELEGRAM_TOKEN + "/sendMessage",
-            json={"chat_id": CHAT_ID, "text": mensagem, "parse_mode": "HTML"},
+            json={"chat_id": CHAT_ID, "text": mensagem},
             timeout=10
         )
     except Exception as e:
         print("Erro Telegram: " + str(e))
 
-def verificar_vfs(url, portal):
+def verificar_vfs(pais, portal):
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
+        url = "https://lift.vfsglobal.com/prod/api/v1/appointment/get-available-slots"
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://visa.vfsglobal.com/",
+            "Origin": "https://visa.vfsglobal.com",
+            "country": pais,
+            "mission": "prt"
+        }
         r = requests.get(url, headers=headers, timeout=15)
-        texto = r.text.lower()
-        if "not possible to proceed" in texto:
-            print(portal + " indisponivel")
+        print(portal + " status: " + str(r.status_code))
+        print(portal + " resposta: " + r.text[:200])
+
+        if r.status_code == 200:
+            data = r.json()
+            if data and len(data) > 0:
+                enviar_telegram("VAGA DISPONIVEL! VFS " + portal + "\nAbre ja o site!\nhttps://visa.vfsglobal.com/" + pais + "/pt/prt/")
+            else:
+                print(portal + " sem vagas")
         else:
-            print(portal + " disponivel!")
-            enviar_telegram("VFS " + portal + " disponivel!\n" + url)
+            print(portal + " erro " + str(r.status_code))
     except Exception as e:
         print(portal + " erro: " + str(e))
 
 portais = [
-    ("https://visa.vfsglobal.com/ago/pt/prt/", "Angola"),
-    ("https://visa.vfsglobal.com/bra/pt/prt/", "Brasil"),
+    ("ago", "Angola"),
+    ("bra", "Brasil"),
 ]
 
-enviar_telegram("VFS Monitor iniciado!")
+enviar_telegram("VFS Monitor v2 iniciado!")
 
 while True:
-    for url, portal in portais:
-        verificar_vfs(url, portal)
+    for pais, portal in portais:
+        verificar_vfs(pais, portal)
         time.sleep(5)
     time.sleep(300)
